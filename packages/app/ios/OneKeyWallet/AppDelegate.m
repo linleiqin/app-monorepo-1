@@ -6,14 +6,14 @@
 #import <React/RCTLinkingManager.h>
 #import <React/RCTConvert.h>
 
-#if defined(EX_DEV_MENU_ENABLED)
-@import EXDevMenu;
-#endif
- 
-#if defined(EX_DEV_LAUNCHER_ENABLED)
-#include <EXDevLauncher/EXDevLauncherController.h>
-#import <EXUpdatesDevLauncherController.h>
-#endif
+//#if defined(EX_DEV_MENU_ENABLED)
+//@import EXDevMenu;
+//#endif
+//
+//#if defined(EX_DEV_LAUNCHER_ENABLED)
+//#include <EXDevLauncher/EXDevLauncherController.h>
+//#import <EXUpdatesDevLauncherController.h>
+//#endif
 
 @implementation AppDelegate
 
@@ -21,13 +21,13 @@
 {
     self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
  
-#if defined(EX_DEV_LAUNCHER_ENABLED)
-  EXDevLauncherController *controller = [EXDevLauncherController sharedInstance];
-  controller.updatesInterface = [EXUpdatesDevLauncherController sharedInstance];
-  [controller startWithWindow:self.window delegate:(id<EXDevLauncherControllerDelegate>)self launchOptions:launchOptions];
-#else
+//#if defined(EX_DEV_LAUNCHER_ENABLED)
+//  EXDevLauncherController *controller = [EXDevLauncherController sharedInstance];
+//  controller.updatesInterface = [EXUpdatesDevLauncherController sharedInstance];
+//  [controller startWithWindow:self.window delegate:(id<EXDevLauncherControllerDelegate>)self launchOptions:launchOptions];
+//#else
   [self initializeReactNativeApp:launchOptions];
-#endif
+//#endif
  
   [super application:application didFinishLaunchingWithOptions:launchOptions];
  
@@ -60,24 +60,24 @@
 }
 
 - (NSURL *)sourceURLForBridge:(RCTBridge *)bridge {
- #ifdef DEBUG
-  #if defined(EX_DEV_LAUNCHER_ENABLED)
-    return [[EXDevLauncherController sharedInstance] sourceUrl];
-  #else
-    return [[RCTBundleURLProvider sharedSettings] jsBundleURLForBundleRoot:@"__generated__/AppEntry.js" fallbackResource:nil];
-  #endif 
- #else
+// #ifdef DEBUG
+//  #if defined(EX_DEV_LAUNCHER_ENABLED)
+//    return [[EXDevLauncherController sharedInstance] sourceUrl];
+//  #else
+//    return [[RCTBundleURLProvider sharedSettings] jsBundleURLForBundleRoot:@"__generated__/AppEntry.js" fallbackResource:nil];
+//  #endif
+// #else
   return [[NSBundle mainBundle] URLForResource:@"main" withExtension:@"jsbundle"];
- #endif
+// #endif
 }
 
 // Linking API
 - (BOOL)application:(UIApplication *)application openURL:(NSURL *)url options:(NSDictionary<UIApplicationOpenURLOptionsKey,id> *)options {
-#if defined(EX_DEV_LAUNCHER_ENABLED)
-  if ([EXDevLauncherController.sharedInstance onDeepLink:url options:options]) {
-      return true;
-  }
-#endif
+//#if defined(EX_DEV_LAUNCHER_ENABLED)
+//  if ([EXDevLauncherController.sharedInstance onDeepLink:url options:options]) {
+//      return true;
+//  }
+//#endif
   return [RCTLinkingManager application:application openURL:url options:options];
 }
 
@@ -90,14 +90,14 @@
 
 @end
 
-#if defined(EX_DEV_LAUNCHER_ENABLED)
-@implementation AppDelegate (EXDevLauncherControllerDelegate)
- 
-- (void)devLauncherController:(EXDevLauncherController *)developmentClientController
-          didStartWithSuccess:(BOOL)success
-{
-  developmentClientController.appBridge = [self initializeReactNativeApp:[EXDevLauncherController.sharedInstance getLaunchOptions]];
-}
- 
-@end
-#endif
+//#if defined(EX_DEV_LAUNCHER_ENABLED)
+//@implementation AppDelegate (EXDevLauncherControllerDelegate)
+//
+//- (void)devLauncherController:(EXDevLauncherController *)developmentClientController
+//          didStartWithSuccess:(BOOL)success
+//{
+//  developmentClientController.appBridge = [self initializeReactNativeApp:[EXDevLauncherController.sharedInstance getLaunchOptions]];
+//}
+//
+//@end
+//#endif
