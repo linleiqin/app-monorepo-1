@@ -19,6 +19,9 @@ class WrongPassword extends OneKeyError {
 class AccountAlreadyExists extends OneKeyError {
   key = 'onekey_error_account_already_exists';
 }
+class OneKeyHardwareError extends OneKeyError {
+  key = 'onekey_error_hardware';
+}
 
 class FailedToTransfer extends OneKeyError {
   key = 'onekey_error_failed_to_transfer';
@@ -35,4 +38,5 @@ export {
   AccountAlreadyExists,
   FailedToTransfer,
   InvalidAddress,
+  OneKeyHardwareError,
 };

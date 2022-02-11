@@ -19,7 +19,6 @@ type DBSimpleAccount = DBBaseAccount & {
   pub: string;
   address: string;
 };
-
 type DBMulAddrAccount = DBBaseAccount & {
   xpub: string;
   addresses: Record<string, string>;

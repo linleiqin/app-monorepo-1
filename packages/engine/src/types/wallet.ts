@@ -1,4 +1,5 @@
 import { HasName } from './base';
+import { Device } from './device';
 
 const WALLET_TYPE_HD = 'hd';
 const WALLET_TYPE_HW = 'hw';
@@ -12,6 +13,7 @@ type Wallet = HasName & {
   backuped: boolean;
   accounts: Array<string>;
   nextAccountIds: Record<string, number>; // purpose + cointype => index
+  associatedDevice?: Device | string;
 };
 
 export {

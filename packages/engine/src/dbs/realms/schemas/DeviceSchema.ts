@@ -1,8 +1,10 @@
 import Realm from 'realm';
 
+import { Device } from '../../../types/device';
+
 class DeviceSchema extends Realm.Object {
   /**
-   * The device's unique identifier. eg: ble(mac-address), usb(path).
+   * The device's unique identifier.
    */
   public id!: string;
 
@@ -17,14 +19,19 @@ class DeviceSchema extends Realm.Object {
   public updateTime!: Date;
 
   /**
+   * the features of the device
+   */
+  public features!: string;
+
+  /**
    * ble name
    */
   public name!: string;
 
   /**
-   * the features of the device
+   * ble mac address
    */
-  public details!: string;
+  public mac!: string | null;
 
   public static schema: Realm.ObjectSchema = {
     name: 'Device',
@@ -32,11 +39,23 @@ class DeviceSchema extends Realm.Object {
     properties: {
       id: 'string',
       name: 'string',
-      details: 'string',
+      mac: 'string?',
+      features: 'string',
       addedTime: 'date',
       updateTime: 'date',
     },
   };
+
+  get internalObj(): Device {
+    return {
+      id: this.id,
+      name: this.name,
+      mac: this.mac,
+      features: this.features,
+      addedTime: this.addedTime,
+      updateTime: this.updateTime,
+    };
+  }
 }
 
 export { DeviceSchema };

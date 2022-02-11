@@ -2,7 +2,10 @@
 /* eslint @typescript-eslint/no-unused-vars: ["warn", { "argsIgnorePattern": "^_" }] */
 import { Buffer } from 'buffer';
 
+import { UnsignedTransaction } from '@ethersproject/transactions';
+import { EthereumTransaction } from '@onekeyfe/connect';
 import BigNumber from 'bignumber.js';
+import bs58 from 'bs58';
 
 import { RestfulRequest } from '@onekeyhq/blockchain-libs/dist/basic/request/restful';
 import { ProviderController as BaseProviderController } from '@onekeyhq/blockchain-libs/dist/provider';
@@ -18,18 +21,20 @@ import {
   uncompressPublicKey,
 } from '@onekeyhq/blockchain-libs/dist/secret';
 import { ChainInfo } from '@onekeyhq/blockchain-libs/dist/types/chain';
+import { HardwareSigner } from '@onekeyhq/blockchain-libs/dist/types/hardware';
 import {
   TransactionStatus,
   UnsignedTx,
 } from '@onekeyhq/blockchain-libs/dist/types/provider';
 import { Signer, Verifier } from '@onekeyhq/blockchain-libs/dist/types/secret';
 
-import { IMPL_EVM, IMPL_SOL, SEPERATOR } from './constants';
+import { IMPL_CFX, IMPL_EVM, IMPL_SOL, IMPL_STC, SEPERATOR } from './constants';
 import { OneKeyInternalError } from './errors';
+import { getImplFromNetworkId } from './managers/network';
 import { Account, SimpleAccount } from './types/account';
 import { HistoryEntryStatus } from './types/history';
 import { DBNetwork, EIP1559Fee, Network } from './types/network';
-
+import * as OneKeyHardware from './warper';
 // IMPL naming aren't necessarily the same.
 const IMPL_MAPPINGS: Record<string, string> = {
   [IMPL_EVM]: 'eth',
@@ -128,7 +133,7 @@ function fillUnsignedTx(
     type,
     nonce,
     feeLimit,
-    feePricePerUnit: feePricePerUnit.shiftedBy(network.feeDecimals),
+    feePricePerUnit: feePricePerUnit?.shiftedBy(network.feeDecimals),
     payload,
   };
 }
@@ -169,6 +174,54 @@ class ProviderController extends BaseProviderController {
       verify: (_digest: Buffer, _signature: Buffer) =>
         Promise.resolve(Buffer.from([])), // Not used.
     };
+  }
+
+  /**
+   * get the hardware signer
+   */
+  private hardwareTxSigner(impl: string, account: Account): HardwareSigner {
+    switch (impl) {
+      case IMPL_EVM:
+        return {
+          hardwareSign: (
+            signData: UnsignedTransaction & EthereumTransaction,
+          ) => {
+            if (signData.gasPrice) {
+              // legacy tx
+              return OneKeyHardware.ethereumSignTransaction(
+                account.path,
+                signData,
+              );
+            }
+            // eip1559 tx
+            return OneKeyHardware.ethereumSignTxEIP1559({});
+          },
+        };
+      case IMPL_SOL:
+        // return {
+        //   hardwareSigner: async (signData: Buffer) => {
+        //     // @ts-ignore
+        //     const resp = await hardwareClient.solanaSignTransaction({
+        //       path: account.path,
+        //       rawTx: bs58.encode(signData),
+        //     });
+        //     // @ts-ignore
+        //     if (resp.success) {
+        //       return [bs58.decode(resp.payload.signature), 0];
+        //     }
+        //     throw new OneKeyInternalError(
+        //       `Hardware sign ${IMPL_SOL} failed: ${resp.payload.error}`,
+        //     );
+        //   },
+        // };
+        return {} as any as HardwareSigner;
+      case IMPL_CFX:
+        return {} as any as HardwareSigner;
+      case IMPL_STC:
+        return {} as any as HardwareSigner;
+      default:
+        throw new OneKeyInternalError(`Unsupported impl: ${impl}`);
+    }
   }
 
   private getSigners(
@@ -297,28 +350,39 @@ class ProviderController extends BaseProviderController {
   }
 
   async simpleTransfer(
-    seed: Buffer,
-    password: string,
     network: Network,
     account: Account,
     to: string,
     value: BigNumber,
     tokenIdOnNetwork?: string,
     extra?: { [key: string]: any },
+    seed?: Buffer,
+    password?: string,
   ): Promise<{ txid: string; rawTx: string; success: boolean }> {
     const unsignedTx = await this.buildUnsignedTx(
       network.id,
       fillUnsignedTx(network, account, to, value, tokenIdOnNetwork, extra),
     );
+    let signer;
+    if (password && seed) {
+      // soft sign
+      signer = this.getSigners(network.id, seed, password, account);
+    } else {
+      // hardware sign
+      const impl = getImplFromNetworkId(network.id);
+      signer = this.hardwareTxSigner(impl, account);
+    }
     const { txid, rawTx } = await this.signTransaction(
       network.id,
       unsignedTx,
-      this.getSigners(network.id, seed, password, account),
+      // @ts-ignore
+      signer,
     );
+    const success = await this.broadcastTransaction(network.id, rawTx);
     return {
       txid,
       rawTx,
-      success: await this.broadcastTransaction(network.id, rawTx),
+      success,
     };
   }
 

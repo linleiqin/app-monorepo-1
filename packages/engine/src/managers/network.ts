@@ -28,11 +28,7 @@ function fromDBNetworkToNetwork(dbNetwork: DBNetwork): Network {
   const presetRpcURLs = isPresetNetwork
     ? (presetNetworks[dbNetwork.id] || { presetRpcURLs: [] }).presetRpcURLs
     : [];
-  return {
-    ...dbNetwork,
-    preset: isPresetNetwork,
-    presetRpcURLs,
-  };
+  return dbNetwork as Network;
 }
 
 function getImplFromNetworkId(networkId: string): string {

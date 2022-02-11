@@ -18,6 +18,7 @@ import {
   DBAccount,
   DBSimpleAccount,
 } from '../../types/account';
+import { Device } from '../../types/device';
 import {
   HistoryEntry,
   HistoryEntryMeta,
@@ -664,6 +665,10 @@ class FakeDB implements DBAPI {
     );
   }
 
+  addHWWallet(_id: string, _name: string): Promise<Wallet> {
+    throw new Error('Method not implemented.');
+  }
+
   removeWallet(walletId: string, password: string): Promise<void> {
     return this.ready.then(
       (db) =>
@@ -1303,6 +1308,14 @@ class FakeDB implements DBAPI {
           };
         }),
     );
+  }
+
+  upsertDevice(device: Device): Promise<void> {
+    throw new Error('Method not implemented.');
+  }
+
+  getDevices(): Promise<Device[] | undefined> {
+    throw new Error('Method not implemented.');
   }
 }
 

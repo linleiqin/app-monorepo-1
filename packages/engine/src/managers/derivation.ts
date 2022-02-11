@@ -5,7 +5,14 @@ import {
   batchGetPublicKeys,
 } from '@onekeyhq/blockchain-libs/dist/secret';
 
-import { IMPL_EVM, IMPL_SOL } from '../constants';
+import {
+  COINTYPE_ETH,
+  COINTYPE_SOL,
+  COIN_TYPE_BTC,
+  IMPL_BTC,
+  IMPL_EVM,
+  IMPL_SOL,
+} from '../constants';
 import { OneKeyInternalError } from '../errors';
 
 import { implToCoinTypes } from './impl';
@@ -17,6 +24,13 @@ type DerivationSettings = {
   targetLevel?: number;
   hardenedLevels: Array<number>;
 };
+
+const INCREMENT_LEVEL_TAG = 'INCR';
+const IMPL_EVM_44 = `${IMPL_EVM}_44`;
+const IMPL_SOL_44 = `${IMPL_SOL}_44`;
+const IMPL_BTC_44 = `${IMPL_BTC}_44`;
+const IMPL_BTC_49 = `${IMPL_BTC}_49`;
+const IMPL_BTC_84 = `${IMPL_BTC}_84`;
 
 const versionBytesMap: Record<string, Buffer> = {};
 
@@ -40,6 +54,16 @@ const derivationSettings: Record<string, DerivationSettings> = {
     targetLevel: 4,
     hardenedLevels: [1, 2, 3, 4],
   },
+};
+/**
+ * derive path template for different impls
+ */
+const derivationPathTemplates: Record<string, string> = {
+  [IMPL_EVM_44]: `m/44'/${COINTYPE_ETH}'/0'/0/${INCREMENT_LEVEL_TAG}`,
+  [IMPL_SOL_44]: `m/44'/${COINTYPE_SOL}'/${INCREMENT_LEVEL_TAG}'/0'`,
+  [IMPL_BTC_44]: `m/44'/${COIN_TYPE_BTC}'/${INCREMENT_LEVEL_TAG}'`,
+  [IMPL_BTC_49]: `m/49'/${COIN_TYPE_BTC}'/${INCREMENT_LEVEL_TAG}'`,
+  [IMPL_BTC_84]: `m/84'/${COIN_TYPE_BTC}'/${INCREMENT_LEVEL_TAG}'`,
 };
 
 function getXpubs(
@@ -148,4 +172,9 @@ function getDefaultPurpose(impl: string): number {
   return (purposeMap[impl] || [44])[0];
 }
 
-export { getXpubs, getDefaultPurpose };
+export {
+  getXpubs,
+  getDefaultPurpose,
+  derivationPathTemplates,
+  INCREMENT_LEVEL_TAG,
+};

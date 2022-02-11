@@ -1,5 +1,7 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint no-unused-vars: ["warn", { "argsIgnorePattern": "^_" }] */
 /* eslint @typescript-eslint/no-unused-vars: ["warn", { "argsIgnorePattern": "^_" }] */
+import { Features } from '@onekeyfe/connect';
 import BigNumber from 'bignumber.js';
 import * as bip39 from 'bip39';
 
@@ -15,6 +17,7 @@ import {
   FailedToTransfer,
   InvalidAddress,
   NotImplemented,
+  OneKeyHardwareError,
   OneKeyInternalError,
 } from './errors';
 import {
@@ -26,7 +29,12 @@ import {
   getWatchingAccountToCreate,
   isAccountCompatibleWithNetwork,
 } from './managers/account';
-import { getDefaultPurpose, getXpubs } from './managers/derivation';
+import {
+  INCREMENT_LEVEL_TAG,
+  derivationPathTemplates,
+  getDefaultPurpose,
+  getXpubs,
+} from './managers/derivation';
 import { implToCoinTypes } from './managers/impl';
 import {
   fromDBNetworkToNetwork,
@@ -65,13 +73,17 @@ import {
   NetworkShort,
   UpdateNetworkParams,
 } from './types/network';
+import { SecretParams, TransferParams } from './types/params';
 import { Token } from './types/token';
-import { WALLET_TYPE_HD, Wallet } from './types/wallet';
+import { WALLET_TYPE_HD, WALLET_TYPE_HW, Wallet } from './types/wallet';
+import * as OneKeyHardware from './warper';
 
 class Engine {
   private dbApi: DBAPI;
 
   private providerManager: ProviderController;
+
+  // oneKeyClient: typeof OneKeyConnect | undefined;
 
   constructor() {
     this.dbApi = new DbApi() as DBAPI;
@@ -116,6 +128,16 @@ class Engine {
       throw new OneKeyInternalError('Invalid mnemonic.');
     }
     return this.dbApi.createHDWallet(password, rs, name);
+  }
+
+  async addHWWallet(name?: string): Promise<Wallet> {
+    const features = await OneKeyHardware.getFeatures();
+    if (!features.initialized) {
+      throw new OneKeyHardwareError('Hardware wallet not initialized.');
+    }
+    const id = features.onekey_serial ?? features.serial_no!;
+    const walletName = name ?? features.ble_name ?? `OneKey${id.slice(-4)}`;
+    return this.dbApi.addHWWallet(id, walletName);
   }
 
   removeWallet(walletId: string, password: string): Promise<void> {
@@ -291,12 +313,12 @@ class Engine {
   }
 
   async addHDAccount(
-    password: string,
     walletId: string,
     networkId: string,
-    index?: number,
+    password?: string,
     name?: string,
     purpose?: number,
+    index?: number,
   ): Promise<Account> {
     // And an HD account to wallet. Path and name are auto detected if not specified.
     // Raise an error if:
@@ -307,41 +329,57 @@ class Engine {
     // 3. account already exists;
     const wallet = await this.dbApi.getWallet(walletId);
     if (typeof wallet === 'undefined') {
-      return Promise.reject(
-        new OneKeyInternalError(`Wallet ${walletId} not found.`),
-      );
+      throw new OneKeyInternalError(`Wallet ${walletId} not found.`);
     }
-    if (wallet.type !== WALLET_TYPE_HD) {
-      return Promise.reject(
-        new OneKeyInternalError(`Wallet ${walletId} is not an HD wallet.`),
-      );
+    if (wallet.type !== WALLET_TYPE_HD && wallet.type !== WALLET_TYPE_HW) {
+      throw new OneKeyInternalError(`Wallet ${walletId} is not an HD wallet.`);
     }
-
     const impl = getImplFromNetworkId(networkId);
     const usedPurpose = purpose || getDefaultPurpose(impl);
     const usedIndex =
       index ||
       wallet.nextAccountIds[`${usedPurpose}'/${implToCoinTypes[impl]}'`] ||
       0;
+    // because of the template we used, we can't allow the harden index
+    if (usedIndex >= 2 ** 31) {
+      throw new OneKeyInternalError(
+        `Index ${usedIndex} is too large for HD wallet ${walletId}, valid index should less than 2**31.`,
+      );
+    }
+    const path = derivationPathTemplates[
+      `${impl}_${usedPurpose.toString()}`
+    ].replace(INCREMENT_LEVEL_TAG, usedIndex.toString());
+    if (wallet.type === WALLET_TYPE_HW) {
+      let address;
+      if (impl === 'evm') {
+        address = await OneKeyHardware.ethereumGetAddress(path);
+      } else if (impl === 'sol') {
+        address = await OneKeyHardware.solanaGetAddress(path);
+      }
+      const { id } = await this.dbApi.addAccountToWallet(
+        walletId,
+        getHDAccountToAdd(impl, walletId, path, undefined, name, address),
+      );
+      return this.getAccount(id, networkId);
+    }
     const [credential, dbNetwork] = await Promise.all([
-      this.dbApi.getCredential(walletId, password),
+      this.dbApi.getCredential(walletId, password!),
       this.dbApi.getNetwork(networkId),
     ]);
     const { paths, xpubs } = getXpubs(
       getImplFromNetworkId(networkId),
       credential.seed,
-      password,
+      password!,
       usedIndex,
       1,
       usedPurpose,
       dbNetwork.curve,
     );
-    return this.dbApi
-      .addAccountToWallet(
-        walletId,
-        getHDAccountToAdd(impl, walletId, paths[0], xpubs[0], name),
-      )
-      .then((a: DBAccount) => this.getAccount(a.id, networkId));
+    const { id } = await this.dbApi.addAccountToWallet(
+      walletId,
+      getHDAccountToAdd(impl, walletId, paths[0], xpubs[0], name),
+    );
+    return this.getAccount(id, networkId);
   }
 
   addImportedAccount(
@@ -350,7 +388,7 @@ class Engine {
     credential: string,
   ): Promise<Account> {
     // Add an imported account. Raise an error if account already exists, credential is illegal or password is wrong.
-    console.log(`addImportedAccount ${password} ${impl} ${credential}`);
+    console.log(`addImported Account ${password} ${impl} ${credential}`);
     throw new NotImplemented();
   }
 
@@ -536,58 +574,66 @@ class Engine {
     return ret;
   }
 
+  /**
+   *  send a soft or hardware transaction
+   * @param transferData
+   * @returns
+   */
   async transfer(
-    password: string,
-    networkId: string,
-    accountId: string,
-    to: string,
-    value: BigNumber,
-    gasPrice: BigNumber,
-    gasLimit: BigNumber,
-    tokenIdOnNetwork?: string,
-    extra?: { [key: string]: any },
+    transferData: TransferParams & SecretParams,
   ): Promise<{ txid: string; success: boolean }> {
-    const [credential, network, account] = await Promise.all([
-      this.dbApi.getCredential(getWalletIdFromAccountId(accountId), password),
-      this.getNetwork(networkId),
-      this.getAccount(accountId, networkId),
-    ]);
-    try {
-      const { txid, rawTx, success } =
-        await this.providerManager.simpleTransfer(
-          credential.seed,
-          password,
-          network,
-          account,
-          to,
-          value,
-          tokenIdOnNetwork,
-          {
-            ...extra,
-            feeLimit: gasLimit,
-            feePricePerUnit: gasPrice,
-          },
-        );
-      await this.dbApi.addHistoryEntry(
-        `${networkId}--${txid}`,
-        networkId,
-        accountId,
-        HistoryEntryType.TRANSFER,
-        HistoryEntryStatus.PENDING,
-        {
-          contract: tokenIdOnNetwork || '',
-          target: to,
-          value: value.toFixed(),
-          rawTx,
-        },
-      );
-      return { txid, success };
-    } catch (e) {
-      const { message } = e as { message: string };
-      throw new FailedToTransfer(message);
+    const walletID = getWalletIdFromAccountId(transferData.accountId);
+    const wallet = await this.dbApi.getWallet(walletID);
+    if (typeof wallet === 'undefined') {
+      throw new OneKeyInternalError(`wallet ${walletID} not found.`);
     }
+    const [network, account] = await Promise.all([
+      this.getNetwork(transferData.networkId),
+      this.getAccount(transferData.accountId, transferData.networkId),
+    ]);
+    let credential;
+    if (wallet.type !== WALLET_TYPE_HW) {
+      credential = await this.dbApi.getCredential(
+        getWalletIdFromAccountId(transferData.accountId),
+        transferData.password!,
+      );
+    }
+    let resp;
+    try {
+      resp = await this.providerManager.simpleTransfer(
+        network,
+        account,
+        transferData.to,
+        transferData.value,
+        transferData.tokenIdOnNetwork,
+        {
+          ...transferData.extra,
+          feeLimit: transferData.gasLimit,
+          feePricePerUnit: transferData.gasPrice,
+        },
+        credential?.seed,
+        transferData.password,
+      );
+    } catch (e: any) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      throw new FailedToTransfer(e.message);
+    }
+    const { txid, rawTx, success } = resp;
+    await this.dbApi.addHistoryEntry(
+      `${transferData.networkId}--${txid}`,
+      transferData.networkId,
+      transferData.accountId,
+      HistoryEntryType.TRANSFER,
+      HistoryEntryStatus.PENDING,
+      {
+        contract: transferData.tokenIdOnNetwork || '',
+        target: transferData.to,
+        value: transferData.value.toFixed(),
+        rawTx,
+      },
+    );
+    return { txid, success };
   }
-
   // TODO: sign & broadcast.
   // signTransaction
   // signMessage
@@ -787,6 +833,24 @@ class Engine {
     console.log(`resetApp ${password}`);
     return this.dbApi.reset(password);
   }
+
+  /**
+   * store device info
+   * @param features
+   * @param mac the identifier of the device(mac address if android, uuid if ios)
+   * @returns
+   */
+  upsertDevice(features: Features, mac?: string): Promise<void> {
+    const id = features.onekey_serial ?? features.serial_no!;
+    const name =
+      features.ble_name ?? features.label ?? `OneKey ${id.slice(-4)}`;
+    return this.dbApi.upsertDevice({
+      id,
+      name,
+      mac,
+      features: JSON.stringify(features),
+    });
+  }
 }
 
-export { Engine };
+export { Engine, OneKeyHardware };
