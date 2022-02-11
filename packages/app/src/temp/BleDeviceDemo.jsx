@@ -12,8 +12,8 @@ import {
   View,
 } from 'react-native';
 import useStores from '../hooks/use_store';
-import { bleOnekeyConnect } from '../utils/BleOneKeyConnect';
-import { toastLong } from '../utils/ToastUtil';
+import { bleOnekeyConnect } from '@onekeyhq/kit/src/utils/ble/connect';
+import { toastLong } from '@onekeyhq/kit/src/utils/ToastUtil';
 
 const BleDeviceDemo = () => {
   const { bleDeviceStore } = useStores();

@@ -35,37 +35,38 @@ class BleUtils {
     this.manager = new BleManager();
   }
 
-  findConnectedDevices() {
+  async findConnectedDevices(): Promise<Device[]> {
     return this.manager.connectedDevices([
-      '00000003-0000-1000-8000-00805f9b34fb',
+      SERVICE_ID,
     ]);
   }
 
   /**
    * 搜索蓝牙
    * */
-  startDeviceScan(listener: (device: Device | null) => void) {
-    return Promise.resolve()
-      .then(() => this.checkPermission())
-      .then(() => {
-        this.manager.startDeviceScan(
-          null,
-          {
-            scanMode: ScanMode.LowLatency,
-          },
-          (error, device) => {
-            if (error) {
-              console.log('startDeviceScan error:', error);
-              if (error.errorCode === 102) {
-                this.alert('请打开手机蓝牙后再搜索');
-              }
-              throw error;
-            } else {
-              listener(device);
-            }
-          },
-        );
-      });
+  async startDeviceScan(
+    listener: (device: Device | null) => void,
+  ): Promise<void> {
+    await this.checkPermission();
+    this.manager.startDeviceScan(
+      null,
+      {
+        scanMode: ScanMode.LowLatency,
+      },
+      (error, device_1) => {
+        if (error) {
+          console.log('startDeviceScan error:', error);
+          if (error.errorCode === 102) {
+            this.alert('请打开手机蓝牙后再搜索');
+          }
+          throw error;
+        } else {
+          if (device_1) {
+            listener(device_1);
+          }
+        }
+      },
+    );
   }
 
   /**
@@ -84,6 +85,10 @@ class BleUtils {
     this.isConnecting = true;
     try {
       await this.checkPermission();
+      const connected = await this.manager.isDeviceConnected(id);
+      if (connected) {
+        return;
+      }
       const device = await this.manager.connectToDevice(id, {
         timeout: 3000,
         requestMTU: 512,
@@ -103,7 +108,7 @@ class BleUtils {
    * 断开蓝牙
    * */
   async disconnect(deviceId: string) {
-    await this.manager.cancelDeviceConnection(deviceId);
+    return await this.manager.cancelDeviceConnection(deviceId);
   }
 
   async checkPermission() {
@@ -117,69 +122,6 @@ class BleUtils {
       throw new Error('Permission to access location was denied');
     }
   }
-
-  /**
-   * 读取数据
-   * */
-  // read(index: number) {
-  //   return new Promise((resolve, reject) => {
-  //     this.manager
-  //       .readCharacteristicForDevice(
-  //         this.peripheralId!,
-  //         this.readServiceUUID[index],
-  //         this.readCharacteristicUUID[index],
-  //       )
-  //       .then(
-  //         (characteristic) => {
-  //           const buffer = Buffer.from(characteristic.value!, 'base64');
-  //           // let value = buffer.toString();
-  //           const value = this.byteToString(buffer);
-  //           console.log('read success', buffer, value);
-  //           resolve(value);
-  //         },
-  //         (error) => {
-  //           console.log('read fail: ', error);
-  //           if (error instanceof Error) {
-  //             this.alert(`read fail: ${error.message}`);
-  //           }
-  //           reject(error);
-  //         },
-  //       );
-  //   });
-  // }
-
-  // /**
-  //  * 写数据
-  //  * */
-  // write(value: string, index: number) {
-  //   const formatValue =
-  //     value === '0D0A' ? value : Buffer.from(value, 'base64').toString('ascii');
-
-  //   const transactionId = 'write';
-  //   return new Promise((resolve, reject) => {
-  //     this.manager
-  //       .writeCharacteristicWithResponseForDevice(
-  //         this.peripheralId!,
-  //         this.writeWithResponseServiceUUID[index],
-  //         this.writeWithResponseCharacteristicUUID[index],
-  //         formatValue,
-  //         transactionId,
-  //       )
-  //       .then(
-  //         (characteristic) => {
-  //           console.log('write success', value);
-  //           resolve(characteristic);
-  //         },
-  //         (error) => {
-  //           console.log('write fail: ', error);
-  //           if (error instanceof Error) {
-  //             this.alert(`write fail: ${error.message}`);
-  //           }
-  //           reject(error);
-  //         },
-  //       );
-  //   });
-  // }
 
   /**
    * 写数据 withoutResponse
@@ -226,10 +168,8 @@ class BleUtils {
             'ble notification receive data from characteristic.......',
             Buffer.from(characteristic.value, 'base64').toString('hex'),
           );
-
           // TODO
           state.addBuffer(Buffer.from(characteristic.value, 'base64'));
-          console.log('----', state);
         }
       },
       transactionId,

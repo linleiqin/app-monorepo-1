@@ -3,25 +3,37 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
+import { action, makeObservable, observable } from 'mobx';
 import { Buffer } from 'buffer';
 
 type Listener = (state: BleExchange) => boolean;
 
 class BleExchange {
-  debug = true;
+  debug = false;
 
   requestNeeded = false;
 
-  activitySession?: string = undefined;
+  activitySession = undefined;
 
   isReadDone = false;
 
-  buffer: any;
+  buffer = [];
 
-  headbuffer: any;
+  headbuffer = [];
 
   maxSize = 0;
-
+  
+  constructor() {
+    makeObservable(this, {
+      isReadDone: observable,
+      buffer: observable,
+      activitySession: observable,
+      acquire: action.bound,
+      addBuffer: action,
+      release: action.bound,
+    });
+  }
+  
   acquire(): void {
     this.clearData();
     this.requestNeeded = true;
@@ -64,9 +76,7 @@ class BleExchange {
           this.buffer.length,
         );
       }
-      console.log('----this prev', this.isReadDone);
       this.isReadDone = true;
-      console.log('----this', this.isReadDone);
     }
   }
 

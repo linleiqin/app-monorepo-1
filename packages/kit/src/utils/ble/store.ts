@@ -1,36 +1,50 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable import/no-cycle */
 /* eslint-disable no-param-reassign */
 /* eslint-disable no-async-promise-executor */
 import {
-  runInAction,
-  configure,
-  autorun,
   action,
-  observable,
+  autorun,
+  configure,
   makeObservable,
+  observable,
+  runInAction,
 } from 'mobx';
-import bleUtils from '../utils/BleUtils';
-import isOnekeyDevice from '../utils/OnekeyHardware';
-import { toastLong } from '../utils/ToastUtil';
+import { Device } from 'react-native-ble-plx';
 
-let scanTimer = null;
+import { toastLong } from '../ToastUtil';
+
+import bleUtils from './utils';
+
+let scanTimer: any;
 
 configure({
   enforceActions: 'never',
 });
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+const isOnekeyDevice = (device: any): boolean => {
+  // 过滤 BixinKeyxxx 和 Kxxxx
+
+  // i 忽略大小写模式
+  const re = /(BixinKey\d{10})|(K\d{4})/i;
+  if (device && device.name && re.exec(device.name)) {
+    return true;
+  }
+  return false;
+};
 
 class BleDeviceStore {
   isScaning = false;
 
   isConnecting = false;
 
-  connectedDeviceMap = new Map();
+  connectedDeviceMap = new Map<string, Device>();
 
-  findedDeviceMap = new Map();
+  findedDeviceMap = new Map<string, Device>();
 
-  connectedDevices = [];
+  connectedDevices: Device[] = [];
 
-  findedDevices = [];
+  findedDevices: Device[] = [];
 
   constructor() {
     makeObservable(this, {
@@ -48,11 +62,11 @@ class BleDeviceStore {
     });
     this.initConnectedDevices();
 
-    this.connectedDevices = autorun(() => {
-      this.connectedDevices = [...this.connectedDeviceMap.values()];
+    autorun(() => {
+      this.connectedDevices = Array.from(this.connectedDeviceMap.values());
     });
-    this.findedDevices = autorun(() => {
-      this.findedDevices = [...this.findedDeviceMap.values()];
+    autorun(() => {
+      this.findedDevices = Array.from(this.findedDeviceMap.values());
     });
   }
 
@@ -66,6 +80,7 @@ class BleDeviceStore {
         devices.forEach((device) => {
           console.log('已经连接的设备: ', device.id, device.name);
           if (isOnekeyDevice(device)) {
+            // @ts-ignore
             device.connceted = true;
             this.connectedDeviceMap.set(device.id, device);
           }
@@ -76,11 +91,13 @@ class BleDeviceStore {
       });
   }
 
-  async isConnected(deviceId) {
+  async isConnected(deviceId: string): Promise<boolean> {
     const exists = this.connectedDeviceMap.has(deviceId);
-    return (
-      exists === true && this.connectedDeviceMap.get(deviceId).isConnected()
-    );
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    const connected = await this.connectedDeviceMap
+      .get(deviceId)
+      ?.isConnected();
+    return exists && (connected as boolean);
   }
 
   scanDevices(searchTime = 10) {
@@ -95,12 +112,12 @@ class BleDeviceStore {
     try {
       bleUtils.startDeviceScan((device) => {
         if (isOnekeyDevice(device)) {
-          const exists = this.findedDeviceMap.has(device.id);
+          const exists = this.findedDeviceMap.has(device!.id);
           if (!exists) {
             runInAction(() => {
               // 使用Map类型保存搜索到的蓝牙设备，确保列表不显示重复的设备
-              this.findedDeviceMap.set(device.id, device);
-              console.log(device.id, device.name);
+              this.findedDeviceMap.set(device!.id, device!);
+              console.log(device?.id, device?.name);
             });
           }
         }
@@ -115,6 +132,7 @@ class BleDeviceStore {
       }
     } catch (error) {
       runInAction(() => {
+        // @ts-ignore
         this.scaning = false;
       });
 
@@ -133,55 +151,52 @@ class BleDeviceStore {
     }
   }
 
-  connect(device) {
-    return new Promise(async (resolve, reject) => {
-      if (this.isScaning) {
-        // 连接的时候正在扫描，先停止扫描
-        this.stopScanDevices();
-      }
+  async connect(device: Device) {
+    if (this.isScaning) {
+      // 连接的时候正在扫描，先停止扫描
+      this.stopScanDevices();
+    }
+    const connected = await this.isConnected(device.id);
+    if (connected) {
+      console.log(device.id, '已经连接');
+      return;
+    }
 
-      if (await this.isConnected(device.id)) {
-        console.log(device.id, '已经连接');
-        resolve(false);
-        return;
-      }
-
-      if (this.isConnecting) {
-        console.log('有设备正在连接');
-        reject();
-        return;
-      }
-      runInAction(() => {
-        device.connecting = true;
-        this.isConnecting = true;
-      });
-      bleUtils
-        .connect(device.id)
-        .then(
-          runInAction(() => {
-            console.log('连接成功');
-            device.connected = true;
-            this.connectedDeviceMap.set(device.id, device);
-            this.onDeviceDisconnect(device.id);
-            resolve(device);
-          }),
-        )
-        .catch(
-          runInAction((err) => {
-            device.connected = false;
-            reject(err);
-          }),
-        )
-        .finally(() => {
-          runInAction(() => {
-            device.connecting = false;
-            this.isConnecting = false;
-          });
-        });
+    if (this.isConnecting) {
+      console.log('有设备正在连接');
+      return;
+    }
+    runInAction(() => {
+      // @ts-ignore
+      device.connecting = true;
+      this.isConnecting = true;
     });
+    try {
+      await bleUtils.connect(device.id);
+      runInAction(() => {
+        console.log('连接成功');
+        // @ts-ignore
+        device.connected = true;
+        this.connectedDeviceMap.set(device.id, device);
+        this.onDeviceDisconnect(device.id);
+      });
+    } catch (error) {
+      runInAction(() => {
+        // @ts-ignore
+        device.connected = false;
+        // reject(err);
+      });
+      console.log('connect error:', error);
+    } finally {
+      runInAction(() => {
+        // @ts-ignore
+        device.connecting = false;
+        this.isConnecting = false;
+      });
+    }
   }
 
-  disconnect(device) {
+  disconnect(device: Device) {
     bleUtils.disconnect(device.id).then((res) => {
       if (res) {
         this.connectedDeviceMap.delete(device.id);
@@ -189,7 +204,7 @@ class BleDeviceStore {
     });
   }
 
-  onDeviceDisconnect(peripheralId) {
+  onDeviceDisconnect(peripheralId: string) {
     bleUtils.manager.onDeviceDisconnected(peripheralId, (error, device) => {
       runInAction(() => {
         this.connectedDeviceMap.delete(peripheralId);
@@ -201,8 +216,8 @@ class BleDeviceStore {
         console.log(
           'onDeviceDisconnected',
           'device disconnect',
-          device.id,
-          device.name,
+          device?.id,
+          device?.name,
         );
       }
     });
