@@ -16,6 +16,18 @@ export function getTransferAmount(transaction: Transaction | null): string {
       .dividedBy(new BigNumber(10).pow(tokenEvent?.tokenDecimals ?? 1))
       .decimalPlaces(4)
       .toString()} ${tokenEvent?.tokenSymbol}`;
+  } else if (
+    transaction?.tokenType === TokenType.ERC721 &&
+    transaction?.tokenEvent &&
+    transaction.tokenEvent.length > 0
+  ) {
+    // 721 transfer
+    const tokenEvents = transaction?.tokenEvent?.filter(
+      (event) => event.tokenType === TokenType.ERC721,
+    );
+    const tokenSize = tokenEvents?.length ?? 0;
+    const tokenSymbol = tokenEvents[0]?.tokenSymbol ?? '';
+    amount = `${tokenSize} ${tokenSymbol}`;
   } else {
     amount = `${new BigNumber(transaction?.value ?? '')
       .dividedBy(1e18)

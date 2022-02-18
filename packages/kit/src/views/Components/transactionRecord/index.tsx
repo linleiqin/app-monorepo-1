@@ -68,6 +68,7 @@ const getTransactionTypeStr = (
   const stringKeys: Record<TransactionType, string> = {
     'Transfer': 'action__send',
     'Receive': 'action__receive',
+    'Swap': 'transaction__exchange',
     'ContractExecution': 'transaction__multicall',
     // 'Approve': 'action__send',
   };
@@ -82,6 +83,7 @@ const getTransactionTypeIcon = (
   const stringKeys: Record<TransactionType, ICON_NAMES> = {
     'Transfer': 'ArrowUpSolid',
     'Receive': 'ArrowDownSolid',
+    'Swap': 'SwitchHorizontalSolid',
     'ContractExecution': 'ArrowUpSolid',
     // 'Approve': 'BadgeCheckSolid',
   };
