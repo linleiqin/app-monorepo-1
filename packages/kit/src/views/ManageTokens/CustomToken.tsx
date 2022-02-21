@@ -11,7 +11,7 @@ import {
 } from '@onekeyhq/components';
 
 import engine from '../../engine/EngineProvider';
-import { useGeneral } from '../../hooks/redux';
+import { useGeneral, useManageTokens } from '../../hooks/redux';
 import { useToast } from '../../hooks/useToast';
 
 import { ManageTokenRoutes, ManageTokenRoutesParams } from './types';
@@ -36,12 +36,13 @@ export const AddCustomToken: FC<NavigationProps> = ({ route }) => {
     defaultMessage: 'Searching Token...',
   });
   const navigation = useNavigation();
-  const [isDisabled, setIsDisabled] = useState(false);
+  const { mySet } = useManageTokens();
+  const [inputDisabled, setInputDisabled] = useState(false);
   const [isSearching, setSearching] = useState(false);
   const { activeAccount, activeNetwork } = useGeneral();
   const { info } = useToast();
   const address = route.params?.address;
-  const { control, handleSubmit, setValue, watch } =
+  const { control, handleSubmit, setValue, watch, setError } =
     useForm<AddCustomTokenValues>({
       defaultValues: { address: '', symbol: '', decimal: '' },
     });
@@ -78,6 +79,12 @@ export const AddCustomToken: FC<NavigationProps> = ({ route }) => {
   useEffect(() => {
     async function doQuery() {
       const trimedAddress = watchAddress.trim();
+      if (mySet.has(trimedAddress)) {
+        setError('address', {
+          message: intl.formatMessage({ id: 'msg__token_already_existed' }),
+        });
+        return;
+      }
       // now support evm chain
       if (trimedAddress.length === 42 && activeAccount && activeNetwork) {
         let preResult;
@@ -94,10 +101,10 @@ export const AddCustomToken: FC<NavigationProps> = ({ route }) => {
         if (preResult) {
           setValue('decimal', String(preResult[1].decimals));
           setValue('symbol', preResult[1].symbol);
-          setIsDisabled(true);
+          setInputDisabled(true);
         }
       } else {
-        setIsDisabled(false);
+        setInputDisabled(false);
       }
     }
     doQuery();
@@ -143,9 +150,14 @@ export const AddCustomToken: FC<NavigationProps> = ({ route }) => {
                   id: 'form__token_symbol',
                   defaultMessage: 'Token Symbol',
                 })}
+                rules={{
+                  required: intl.formatMessage({
+                    id: 'form__field_is_required',
+                  }),
+                }}
                 control={control}
               >
-                <Form.Input isDisabled={isDisabled} />
+                <Form.Input isDisabled={inputDisabled} />
               </Form.Item>
               <Form.Item
                 name="decimal"
@@ -154,8 +166,13 @@ export const AddCustomToken: FC<NavigationProps> = ({ route }) => {
                   defaultMessage: 'Decimal',
                 })}
                 control={control}
+                rules={{
+                  required: intl.formatMessage({
+                    id: 'form__field_is_required',
+                  }),
+                }}
               >
-                <Form.Input isDisabled={isDisabled} />
+                <Form.Input isDisabled={inputDisabled} />
               </Form.Item>
             </Form>
           </KeyboardDismissView>
