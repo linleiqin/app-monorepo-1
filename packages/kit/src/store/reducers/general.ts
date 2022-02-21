@@ -1,11 +1,12 @@
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
+import { Dispatch } from 'redux';
 
 import type { Account } from '@onekeyhq/engine/src/types/account';
 import type { Wallet } from '@onekeyhq/engine/src/types/wallet';
 
 import type { Network } from './network';
 
-type InitialState = {
+export type GeneralInitialState = {
   activeAccount: Account | null;
   activeWallet: Wallet | null;
   activeNetwork: {
@@ -14,7 +15,7 @@ type InitialState = {
   } | null;
 };
 
-const initialState: InitialState = {
+const initialState: GeneralInitialState = {
   activeAccount: null,
   activeNetwork: null,
   activeWallet: null,
@@ -24,7 +25,7 @@ export const generalSlice = createSlice({
   name: 'general',
   initialState,
   reducers: {
-    changeActiveAccount(
+    $changeActiveAccount(
       state,
       action: PayloadAction<{ account: Account | null; wallet: Wallet }>,
     ) {
@@ -32,16 +33,33 @@ export const generalSlice = createSlice({
       state.activeAccount = account;
       state.activeWallet = wallet;
     },
-    changeActiveNetwork(
+    $changeActiveNetwork(
       state,
-      action: PayloadAction<NonNullable<InitialState['activeNetwork']>>,
+      action: PayloadAction<NonNullable<GeneralInitialState['activeNetwork']>>,
     ) {
+      // TODO chainId, networkVersion required in activeNetwork
       state.activeNetwork = action.payload;
     },
   },
 });
 
-export const { changeActiveAccount, changeActiveNetwork } =
-  generalSlice.actions;
+const { $changeActiveAccount, $changeActiveNetwork } = generalSlice.actions;
+
+export const changeActiveAccount =
+  (state: { account: Account | null; wallet: Wallet }) =>
+  async (dispatch: Dispatch) => {
+    dispatch($changeActiveAccount(state));
+    // use global var to avoid cycle-deps
+    global.$backgroundApiProxy.notifyAccountsChanged();
+    return Promise.resolve();
+  };
+
+export const changeActiveNetwork =
+  (state: NonNullable<GeneralInitialState['activeNetwork']>) =>
+  async (dispatch: Dispatch) => {
+    dispatch($changeActiveNetwork(state));
+    global.$backgroundApiProxy.notifyChainChanged();
+    return Promise.resolve();
+  };
 
 export default generalSlice.reducer;
