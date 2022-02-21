@@ -1,0 +1,35 @@
+{
+  "files": {
+    "app.js": "/static/js/app.6d43e499.chunk.js",
+    "app.js.map": "/static/js/app.6d43e499.chunk.js.map",
+    "runtime~app.js": "/static/js/runtime~app.2e9f1821.js",
+    "runtime~app.js.map": "/static/js/runtime~app.2e9f1821.js.map",
+    "static/js/2.58f03c78.chunk.js": "/static/js/2.58f03c78.chunk.js",
+    "static/js/2.58f03c78.chunk.js.map": "/static/js/2.58f03c78.chunk.js.map",
+    "favicon-16.png": "/favicon-16.png",
+    "favicon-32.png": "/favicon-32.png",
+    "favicon.ico": "/favicon.ico",
+    "index.html": "/index.html",
+    "manifest.json": "/manifest.json",
+    "serve.json": "/serve.json",
+    "static/js/2.58f03c78.chunk.js.LICENSE.txt": "/static/js/2.58f03c78.chunk.js.LICENSE.txt",
+    "static/media/PlusJakartaSans-Bold.ttf": "/static/media/PlusJakartaSans-Bold.669b6c57.ttf",
+    "static/media/PlusJakartaSans-Medium.ttf": "/static/media/PlusJakartaSans-Medium.82a1829c.ttf",
+    "static/media/PlusJakartaSans-SemiBold.ttf": "/static/media/PlusJakartaSans-SemiBold.d2391ea6.ttf",
+    "static/media/ic_pair_hardware_connecting.png": "/static/media/ic_pair_hardware_connecting.67e3d6b0.png",
+    "static/media/ic_pair_hardware_operation_complete.png": "/static/media/ic_pair_hardware_operation_complete.b8dd2e31.png",
+    "static/media/ic_pair_hint_scan_lite.png": "/static/media/ic_pair_hint_scan_lite.ee34873f.png",
+    "static/media/ic_pair_nfc.png": "/static/media/ic_pair_nfc.351c042b.png",
+    "static/media/ic_pair_nfc_operation_successful.png": "/static/media/ic_pair_nfc_operation_successful.67fda4f4.png",
+    "static/media/ic_pair_nfc_transfer.png": "/static/media/ic_pair_nfc_transfer.bd74124f.png",
+    "static/media/slider_img1.png": "/static/media/slider_img1.4d75859f.png",
+    "static/media/slider_img2.png": "/static/media/slider_img2.00794eaa.png",
+    "static/media/slider_img3.png": "/static/media/slider_img3.7ff41add.png",
+    "static/media/terms.png": "/static/media/terms.015ffefd.png"
+  },
+  "entrypoints": [
+    "static/js/runtime~app.2e9f1821.js",
+    "static/js/2.58f03c78.chunk.js",
+    "static/js/app.6d43e499.chunk.js"
+  ]
+}
